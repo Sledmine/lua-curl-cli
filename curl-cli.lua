@@ -1,6 +1,6 @@
 local _, json = pcall(require, "json")
 
-local curl = {}
+local curl = {_VERSION = "0.0.1"}
 
 -- JSON backend module, you can replace it with any other JSON module
 curl.json = json
@@ -34,7 +34,6 @@ local CURL_ERROR_PATTERN = "^curl: "
 
 ---@class requestArgs : requestArgsOptional
 ---@field url string
-
 
 curl.debug = false
 
@@ -79,12 +78,7 @@ local function parseCurlOutput(output)
 
     if line:match(CURL_ERROR_PATTERN) then
         error = line
-        return {
-            headers = responseHeaders,
-            statusCode = 0,
-            error = error,
-            ok = false
-        }
+        return {headers = responseHeaders, statusCode = 0, error = error, ok = false}
     end
 
     while line do
@@ -185,7 +179,8 @@ local function prepareCurlCommand(args, method)
     if args.cert then
         table.insert(curlArgs, string.format("--cert %s", args.cert))
     end
-    local cmd = string.format("curl -i -sS -X %s '%s' %s 2>&1", method, args.url, table.concat(curlArgs, " "))
+    local cmd = string.format("curl -i -sS -X %s '%s' %s 2>&1", method, args.url,
+                              table.concat(curlArgs, " "))
     if curl.debug then
         print(cmd)
     end
