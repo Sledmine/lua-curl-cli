@@ -1,5 +1,4 @@
 local curl = require "curl-cli"
-local inspect = require "inspect"
 
 curl.debug = true
 
