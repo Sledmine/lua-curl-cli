@@ -1,7 +1,7 @@
 local _, json = pcall(require, "json")
 
 local curl = {
-    _VERSION = "0.0.1",
+    _VERSION = "0.0.2",
     -- JSON backend module, you can replace it with any other JSON module
     ---@type {encode: fun(t: table): string; decode: fun(s: string): table}
     json = json
@@ -108,8 +108,11 @@ local function parseCurlOutput(output)
         headers = responseHeaders,
         statusCode = code,
         json = function()
-            local _, json = pcall(curl.json.decode, text)
-            return json
+            local success, json = pcall(curl.json.decode, text)
+            if success then
+                return json
+            end
+            return nil
         end,
         error = error,
         ok = not error and code and code < 400
