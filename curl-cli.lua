@@ -1,10 +1,10 @@
-local _, json = pcall(require, "json")
+local isJsonModuleAvailable, json = pcall(require, "json")
 
 local curl = {
-    _VERSION = "0.0.2",
+    _VERSION = "0.0.3",
     -- JSON backend module, you can replace it with any other JSON module
-    ---@type {encode: fun(t: table): string; decode: fun(s: string): table}
-    json = json
+    ---@type {encode: fun(t: table): string; decode: fun(s: string): table} | nil
+    json = isJsonModuleAvailable and json or nil
 }
 
 local HTTP_PROTOCOL_VERSION_PATTERN = "^HTTP/[1-9]* (%d+)"
@@ -108,6 +108,9 @@ local function parseCurlOutput(output)
         headers = responseHeaders,
         statusCode = code,
         json = function()
+            if not curl.json then
+                _G.error("JSON backend module not found")
+            end
             local success, json = pcall(curl.json.decode, text)
             if success then
                 return json
