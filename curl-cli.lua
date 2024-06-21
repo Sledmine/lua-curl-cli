@@ -1,9 +1,11 @@
 local _, json = pcall(require, "json")
 
-local curl = {_VERSION = "0.0.1"}
-
--- JSON backend module, you can replace it with any other JSON module
-curl.json = json
+local curl = {
+    _VERSION = "0.0.1",
+    -- JSON backend module, you can replace it with any other JSON module
+    ---@type {encode: fun(t: table): string; decode: fun(s: string): table}
+    json = json
+}
 
 local HTTP_PROTOCOL_VERSION_PATTERN = "^HTTP/[1-9]* (%d+)"
 local HEADER_PATTERN = "^([%w-]+):%s*(.+)"
@@ -106,7 +108,7 @@ local function parseCurlOutput(output)
         headers = responseHeaders,
         statusCode = code,
         json = function()
-            local _, json = pcall(json.decode, text)
+            local _, json = pcall(curl.json.decode, text)
             return json
         end,
         error = error,
@@ -153,7 +155,7 @@ local function prepareCurlCommand(args, method)
     if args.json then
         args.headers = args.headers or {}
         args.headers["Content-Type"] = "application/json"
-        table.insert(curlArgs, "-d '" .. json.encode(args.json) .. "'")
+        table.insert(curlArgs, "-d '" .. curl.json.encode(args.json) .. "'")
     end
     if args.headers then
         for key, value in pairs(args.headers) do
