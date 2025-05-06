@@ -3,6 +3,11 @@ local curl = require "curl-cli"
 
 curl.debug = true
 
+local HTTP_PROTOCOL_VERSION_PATTERN = curl.HTTP_PROTOCOL_VERSION_PATTERN
+assert(("HTTP/1.1 200 OK"):match(HTTP_PROTOCOL_VERSION_PATTERN) == "200", "HTTP1.1 PATTERN failed")
+assert(("HTTP/2.0 404 Not Found"):match(HTTP_PROTOCOL_VERSION_PATTERN) == "404", "HTTP2.0 PATTERN failed")
+assert(("HTTP/2 500 Internal Server Error"):match(HTTP_PROTOCOL_VERSION_PATTERN) == "500", "HTTP2 PATTERN failed")
+
 -- Test GET request
 local request = curl.get("https://jsonplaceholder.typicode.com/todos/1")
 assert(request.statusCode == 200)

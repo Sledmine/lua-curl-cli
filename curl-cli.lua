@@ -1,15 +1,19 @@
 local isJsonModuleAvailable, json = pcall(require, "json")
 
 local curl = {
-    _VERSION = "0.0.3",
+    _VERSION = "0.0.4",
     -- JSON backend module, you can replace it with any other JSON module
     ---@type {encode: fun(t: table): string; decode: fun(s: string): table} | nil
     json = isJsonModuleAvailable and json or nil
 }
 
-local HTTP_PROTOCOL_VERSION_PATTERN = "^HTTP/[1-9]* (%d+)"
+local HTTP_PROTOCOL_VERSION_PATTERN = "^HTTP/[0-9]+.*[0-9]* (%d+)"
 local HEADER_PATTERN = "^([%w-]+):%s*(.+)"
 local CURL_ERROR_PATTERN = "^curl: "
+
+curl.HTTP_PROTOCOL_VERSION_PATTERN = HTTP_PROTOCOL_VERSION_PATTERN
+curl.HEADER_PATTERN = HEADER_PATTERN
+curl.CURL_ERROR_PATTERN = CURL_ERROR_PATTERN
 
 ---@class httpResponse
 ---@field cookies? table<string, string>
@@ -31,7 +35,7 @@ local CURL_ERROR_PATTERN = "^curl: "
 ---@field timeout? number
 ---@field form? boolean
 ---@field allowRedirects? boolean
----@field verify? boolean
+---@field verify? boolean | string
 ---@field cert? string
 
 ---@class requestArgs : requestArgsOptional
@@ -60,9 +64,6 @@ end
 local function trim(s)
     return s:match("^%s*(.-)%s*$")
 end
-if not string["trim"] then
-    string.trim = trim
-end
 
 --- Parse the output of a curl command
 ---@param output file*
@@ -90,7 +91,8 @@ local function parseCurlOutput(output)
         elseif line:match(HEADER_PATTERN) then
             -- Get response headers
             local key, value = line:match(HEADER_PATTERN)
-            responseHeaders[key:lower()] = value
+            table.insert(responseHeaders, {key = key:lower(), value = value})
+            --responseHeaders[key:lower()] = value
         else
             -- Get response body
             text = text .. line
@@ -99,7 +101,7 @@ local function parseCurlOutput(output)
         ---@type string?
         line = output:read("l")
         if line then
-            line = line:trim()
+            line = trim(line)
         end
     end
 
@@ -181,7 +183,8 @@ local function prepareCurlCommand(args, method)
     if args.allowRedirects then
         table.insert(curlArgs, "-L")
     end
-    if args.verify then
+    args.verify = args.verify == nil and true or args.verify
+    if not args.verify then
         table.insert(curlArgs, "-k")
     end
     if args.cert then
