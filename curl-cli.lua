@@ -1,10 +1,11 @@
 local isJsonModuleAvailable, json = pcall(require, "json")
 
 local curl = {
-    _VERSION = "0.0.5",
+    _VERSION = "0.0.6",
     -- JSON backend module, you can replace it with any other JSON module
     ---@type {encode: fun(t: table): string; decode: fun(s: string): table} | nil
-    json = isJsonModuleAvailable and json or nil
+    json = isJsonModuleAvailable and json or nil,
+    execute = os.execute
 }
 
 local HTTP_PROTOCOL_VERSION_PATTERN = "^HTTP/[0-9]+.*[0-9]* (%d+)"
@@ -267,7 +268,7 @@ local function request(method, args)
     local cmd = prepareCurlCommand(args, method)
     local isDownload = args.download or args.output
     if isDownload then
-        local result = os.execute(cmd)
+        local result = curl.execute(cmd)
         if type(result) == "number" then
             result = result == 0
         end
