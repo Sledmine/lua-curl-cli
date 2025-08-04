@@ -1,7 +1,7 @@
 local isJsonModuleAvailable, json = pcall(require, "json")
 
 local curl = {
-    _VERSION = "0.0.4",
+    _VERSION = "0.0.5",
     -- JSON backend module, you can replace it with any other JSON module
     ---@type {encode: fun(t: table): string; decode: fun(s: string): table} | nil
     json = isJsonModuleAvailable and json or nil
@@ -37,6 +37,8 @@ curl.CURL_ERROR_PATTERN = CURL_ERROR_PATTERN
 ---@field allowRedirects? boolean
 ---@field verify? boolean | string
 ---@field cert? string
+---@field output? string -- File path for download
+---@field download? boolean -- If true, the response will be saved to a file specified in `output`
 
 ---@class requestArgs : requestArgsOptional
 ---@field url string
@@ -72,7 +74,7 @@ local function parseCurlOutput(output)
     local code
     local text = ""
     local responseHeaders = {}
-    local error
+    local errorMessage
 
     local line = output:read("l")
     if not line then
@@ -80,8 +82,8 @@ local function parseCurlOutput(output)
     end
 
     if line:match(CURL_ERROR_PATTERN) then
-        error = line
-        return {headers = responseHeaders, statusCode = 0, error = error, ok = false}
+        errorMessage = line
+        return {headers = responseHeaders, statusCode = 0, error = errorMessage, ok = false}
     end
 
     while line do
@@ -92,7 +94,7 @@ local function parseCurlOutput(output)
             -- Get response headers
             local key, value = line:match(HEADER_PATTERN)
             table.insert(responseHeaders, {key = key:lower(), value = value})
-            --responseHeaders[key:lower()] = value
+            -- responseHeaders[key:lower()] = value
         else
             -- Get response body
             text = text .. line
@@ -104,6 +106,34 @@ local function parseCurlOutput(output)
             line = trim(line)
         end
     end
+
+    --[[
+        Sets a metatable on the `responseHeaders` table to enable key-based access to header values.
+
+        This mechanism allows you to retrieve the value of a header by using its name as a key,
+        similar to accessing a value in a dictionary or table. The metatable's `__index` function
+        iterates through the list of headers, performing a case-insensitive match on the header name.
+        If a matching header is found, its value is returned.
+
+        Note: While HTTP headers can technically have multiple instances with the same name,
+        this approach returns only the first matching value. This is suitable for most use cases,
+        as repeated headers are uncommon. The design provides a more natural and convenient way
+        to access header values, abstracting away the need to manually search through the list.
+
+        If you need to access all header instances or iterate over them, the headers table remains
+        a normal array and can be traversed with ipairs as usual.
+    ]]
+    -- Add a metatable to response headers that looks for an existing key in the list
+    setmetatable(responseHeaders, {
+        __index = function(t, key)
+            for _, header in ipairs(t) do
+                if header.key == key:lower() then
+                    return header.value
+                end
+            end
+            return nil
+        end
+    })
 
     return {
         text = text,
@@ -119,8 +149,8 @@ local function parseCurlOutput(output)
             end
             return nil
         end,
-        error = error,
-        ok = not error and code and code < 400
+        error = errorMessage,
+        ok = not errorMessage and code and code < 400
     }
 end
 
@@ -140,6 +170,7 @@ end
 ---@param method "GET" | "POST" | "PUT" | "DELETE" | "PATCH" | "HEAD" | "OPTIONS"
 ---@return string
 local function prepareCurlCommand(args, method)
+    local includeHeaders = true
     local curlArgs = {}
     if args.params then
         local query = queryParametersToString(args.params)
@@ -190,8 +221,38 @@ local function prepareCurlCommand(args, method)
     if args.cert then
         table.insert(curlArgs, string.format("--cert %s", args.cert))
     end
-    local cmd = string.format("curl -i -sS -X %s '%s' %s 2>&1", method, args.url,
-                              table.concat(curlArgs, " "))
+    local isDownload = args.download or args.output
+    if args.download or args.output then
+        includeHeaders = false
+        if args.download then
+            table.insert(curlArgs, "-O") -- Keep original file name
+        end
+        table.insert(curlArgs, "--progress-bar")
+        if args.output then
+            table.insert(curlArgs, string.format("-o '%s'", args.output))
+        end
+    end
+    local commandArgs = {
+        "curl",
+        not isDownload and "-s" or "", -- Silent mode, do not show progress meter or error messages
+        "-S", -- Show error messages
+        includeHeaders and "-i" or "", -- Include response headers if requested
+        "-X " .. method, -- Set the request method
+        string.format("'%s'", args.url), -- URL to request
+        table.unpack(curlArgs), -- Additional curl arguments
+    }
+    if not isDownload then
+        table.insert(commandArgs, "2>&1") -- Redirect stderr to stdout if not downloading
+    end
+
+    local filtered = {}
+    for _, arg in ipairs(commandArgs) do
+        if arg ~= "" then
+            table.insert(filtered, arg)
+        end
+    end
+    commandArgs = filtered
+    local cmd = table.concat(commandArgs, " ")
     if curl.debug then
         print(cmd)
     end
@@ -204,6 +265,20 @@ end
 ---@return httpResponse
 local function request(method, args)
     local cmd = prepareCurlCommand(args, method)
+    local isDownload = args.download or args.output
+    if isDownload then
+        local result = os.execute(cmd)
+        if type(result) == "number" then
+            result = result == 0
+        end
+        return {
+            headers = {},
+            statusCode = result and 200 or 0,
+            error = result and nil or "Download failed due to curl error",
+            ok = result,
+            url = args.url
+        }
+    end
     local process = assert(io.popen(cmd, "r"))
     local response = parseCurlOutput(process)
     process:close()
@@ -325,6 +400,30 @@ function curl.options(...)
         args.url = varargs[1]
     end
     return request("OPTIONS", args)
+end
+
+--- Download a file from a URL using curl
+---@oevrload fun(args: requestArgs): httpResponse
+---@overload fun(url: string, output: string, args?: requestArgsOptional): httpResponse
+---@return httpResponse
+function curl.download(...)
+    local varargs = {...}
+    ---@type requestArgsOptional
+    local args = varargs[1]
+    if type(varargs[1]) == "string" then
+        args = varargs[3] or {}
+        args.url = varargs[1]
+        args.output = varargs[2]
+    elseif type(varargs[1]) == "table" then
+        args = varargs[1]
+    end
+    if not args.output then
+        error("Output file path is required for download")
+    end
+    if not args.url then
+        error("URL is required for download")
+    end
+    return request("GET", args)
 end
 
 return curl

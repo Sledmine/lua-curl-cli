@@ -80,4 +80,28 @@ assert(request.statusCode == 404)
 request = curl.get("https://127.0.0.9")
 assert(request.error)
 
+-- Test file download
+request = curl.get("https://www.lua.org/images/lua-logo.gif", {
+    download = true
+    --output = "lua-logo.gif"
+})
+assert(request.statusCode == 200)
+local file = io.open("lua-logo.gif", "rb")
+assert(file, "Failed to open downloaded file")
+file:close()
+os.remove("lua-logo.gif") -- Clean up after test
+
+request = curl.download("https://www.lua.org/images/lua-logo.gif","/tmp/lua-logo.gif")
+assert(request.statusCode == 200)
+local file = io.open("/tmp/lua-logo.gif", "rb")
+assert(file, "Failed to open downloaded file")
+file:close()
+os.remove("/tmp/lua-logo.gif") -- Clean up after test
+
+-- Test failed file download
+request = curl.get("https://127.0.0.9", {
+    output = "lua-logo.gif"
+})
+assert(request.error, "Expected error for failed download")
+
 print("All tests passed!")
