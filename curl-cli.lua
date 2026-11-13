@@ -33,17 +33,17 @@ local unpack = table.unpack or unpack
 ---@field error string?
 
 ---@class requestArgsOptional
----@field params? table<string, string | number>
----@field data? string | table
----@field json? table
----@field headers? table<string, string>
----@field cookies? table<string, string>
----@field auth? string | string[] | table
----@field timeout? number
----@field form? boolean
----@field allowRedirects? boolean
----@field verify? boolean | string
----@field cert? string
+---@field params? table<string, string | number> Query parameters to include in the request
+---@field data? string | table Data payload to include in the request
+---@field json? table JSON payload to include in the request
+---@field headers? table<string, string> Headers to include in the request
+---@field cookies? table<string, string> Cookies to include in the request
+---@field auth? string | string[] | table Authentication credentials for the request
+---@field timeout? number Timeout for the request in seconds
+---@field form? boolean Submit the request as a form if true
+---@field allowRedirects? boolean Follow HTTP redirects if true
+---@field verify? boolean | string Verify peer SSL certificate
+---@field cert? string Client SSL certificate file path
 ---@field output? string -- File path for download
 ---@field download? boolean -- If true, the response will be saved to a file specified in `output`
 

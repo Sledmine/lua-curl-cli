@@ -81,27 +81,27 @@ request = curl.get("https://127.0.0.9")
 assert(request.error)
 
 -- Test file download
-request = curl.get("https://www.lua.org/images/lua-logo.gif", {
+request = curl.get("https://placehold.co/600x400/png", {
     download = true
-    --output = "lua-logo.gif"
 })
 assert(request.statusCode == 200)
-local file = io.open("lua-logo.gif", "rb")
-assert(file, "Failed to open downloaded file")
+local file = io.open("png", "rb")
+assert(file, "Failed to download file relative to current directory")
 file:close()
-os.remove("lua-logo.gif") -- Clean up after test
+os.remove("png") -- Clean up after test
 
-request = curl.download("https://www.lua.org/images/lua-logo.gif","/tmp/lua-logo.gif")
+request = curl.download("https://placehold.co/600x400/png","/tmp/lua-file")
 assert(request.statusCode == 200)
-local file = io.open("/tmp/lua-logo.gif", "rb")
-assert(file, "Failed to open downloaded file")
+local file = io.open("/tmp/lua-file", "rb")
+assert(file, "Failed download file with given output path")
 file:close()
-os.remove("/tmp/lua-logo.gif") -- Clean up after test
+os.remove("/tmp/lua-file") -- Clean up after test
 
 -- Test failed file download
 request = curl.get("https://127.0.0.9", {
-    output = "lua-logo.gif"
+    output = "/tmp/lua-file"
 })
+os.remove("/tmp/lua-file") -- Clean up after test
 assert(request.error, "Expected error for failed download")
 
 print("All tests passed!")
