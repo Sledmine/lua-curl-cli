@@ -1,7 +1,7 @@
 local isJsonModuleAvailable, json = pcall(require, "json")
 
 local curl = {
-    _VERSION = "0.0.8",
+    _VERSION = "0.0.9",
     -- JSON backend module, you can replace it with any other JSON module
     ---@type {encode: fun(t: table): string; decode: fun(s: string): table} | nil
     json = isJsonModuleAvailable and json or nil,
@@ -16,6 +16,11 @@ local CURL_ERROR_PATTERN = "^curl: "
 curl.HTTP_PROTOCOL_VERSION_PATTERN = HTTP_PROTOCOL_VERSION_PATTERN
 curl.HEADER_PATTERN = HEADER_PATTERN
 curl.CURL_ERROR_PATTERN = CURL_ERROR_PATTERN
+
+-- Fallback for table.unpack in case it's not available (Lua 5.1 compatibility)
+
+---@diagnostic disable-next-line: deprecated
+local unpack = table.unpack or unpack
 
 ---@class httpResponse
 ---@field cookies? table<string, string>
@@ -241,7 +246,7 @@ local function prepareCurlCommand(args, method)
         includeHeaders and "-i" or "", -- Include response headers if requested
         method == "HEAD" and "-I" or "-X " .. method, -- HTTP method to use
         string.format("'%s'", args.url), -- URL to request
-        table.unpack(curlArgs), -- Additional curl arguments
+        unpack(curlArgs), -- Additional curl arguments
     }
     if not isDownload then
         table.insert(commandArgs, "2>&1") -- Redirect stderr to stdout if not downloading
@@ -405,7 +410,7 @@ function curl.options(...)
 end
 
 --- Download a file from a URL using curl
----@oevrload fun(args: requestArgs): httpResponse
+---@overload fun(args: requestArgs): httpResponse
 ---@overload fun(url: string, output: string, args?: requestArgsOptional): httpResponse
 ---@return httpResponse
 function curl.download(...)
